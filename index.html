@@ -168,7 +168,7 @@
 
     .roster-form {
       display: grid;
-      grid-template-columns: minmax(190px, 1fr) 160px 160px 110px auto;
+      grid-template-columns: minmax(180px, 1fr) 120px 150px 150px 95px auto;
       gap: 10px;
       align-items: end;
     }
@@ -206,7 +206,7 @@
 
     .roster-item {
       display: grid;
-      grid-template-columns: minmax(150px, 1fr) auto auto;
+      grid-template-columns: 48px minmax(150px, 1fr) auto auto;
       gap: 12px;
       align-items: center;
       padding: 11px 12px;
@@ -219,9 +219,34 @@
       color: var(--muted);
       font-size: 13px;
     }
+    .roster-avatar {
+      display: grid;
+      width: 46px;
+      height: 46px;
+      place-items: center;
+      overflow: hidden;
+      border: 2px solid #30445f;
+      border-radius: 50%;
+      color: #d8e4f2;
+      background: #14263c;
+      font-size: 13px;
+      font-weight: 950;
+    }
+    .roster-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
     .mini-actions { display: flex; gap: 7px; }
     .mini-actions .btn { min-height: 36px; padding: 0 11px; font-size: 13px; }
+
+    .photo-picker { display: flex; align-items: center; gap: 8px; }
+    .photo-preview {
+      width: 44px;
+      height: 44px;
+      border: 2px solid #30445f;
+      border-radius: 50%;
+      object-fit: cover;
+      background: #132238;
+    }
+    .photo-picker .btn { min-height: 40px; padding: 0 10px; font-size: 12px; }
 
     textarea {
       width: 100%;
@@ -654,13 +679,116 @@
       gap: 10px;
       margin: 18px 0 22px;
     }
-    .results.visible + .results-actions { display: flex; }
+    .results.visible ~ .results-actions { display: flex; }
+
+    .pitch-section {
+      display: none;
+      margin-top: 20px;
+      padding: 22px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 22px;
+      background: linear-gradient(155deg, rgba(14,28,46,.98), rgba(10,23,39,.98));
+      box-shadow: var(--shadow);
+    }
+    .pitch-section.visible { display: block; }
+    .pitch-section-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .pitch-section-title h2 { margin: 0; font-size: 24px; }
+    .pitches { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .pitch-card {
+      overflow: hidden;
+      border: 1px solid #29405b;
+      border-radius: 18px;
+      background: #0a1626;
+    }
+    .pitch-card header {
+      display: flex;
+      justify-content: space-between;
+      padding: 13px 16px;
+      font-weight: 900;
+    }
+    .pitch-card.blue header { color: #6de2f5; background: rgba(53,191,224,.12); }
+    .pitch-card.white header { color: #111827; background: #f4f6fa; }
+    .football-pitch {
+      position: relative;
+      aspect-ratio: 3 / 4;
+      margin: 14px;
+      overflow: hidden;
+      border: 2px solid rgba(255,255,255,.46);
+      border-radius: 6px;
+      background:
+        linear-gradient(90deg, transparent 49.7%, rgba(255,255,255,.42) 49.7% 50.3%, transparent 50.3%),
+        repeating-linear-gradient(90deg, #197247 0 14.28%, #1d7c4e 14.28% 28.56%);
+    }
+    .football-pitch::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 23%;
+      aspect-ratio: 1;
+      border: 2px solid rgba(255,255,255,.42);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .football-pitch::after {
+      content: "";
+      position: absolute;
+      left: 25%;
+      right: 25%;
+      bottom: -2px;
+      height: 13%;
+      border: 2px solid rgba(255,255,255,.42);
+    }
+    .pitch-player {
+      position: absolute;
+      z-index: 2;
+      width: 86px;
+      text-align: center;
+      transform: translate(-50%, -50%);
+    }
+    .pitch-avatar {
+      display: grid;
+      width: 52px;
+      height: 52px;
+      margin: 0 auto -3px;
+      place-items: center;
+      overflow: hidden;
+      border: 3px solid #fff;
+      border-radius: 50%;
+      color: #fff;
+      background: #152b43;
+      box-shadow: 0 6px 16px rgba(0,0,0,.35);
+      font-size: 15px;
+      font-weight: 950;
+    }
+    .pitch-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .pitch-player-name {
+      display: inline-block;
+      max-width: 86px;
+      overflow: hidden;
+      padding: 3px 6px;
+      border-radius: 7px;
+      color: #0b1623;
+      background: rgba(255,255,255,.94);
+      box-shadow: 0 3px 10px rgba(0,0,0,.22);
+      font-size: 11px;
+      font-weight: 950;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
 
     @media (max-width: 820px) {
       .hero-stats { width: 100%; }
       .hero-stats div { flex: 1; min-width: 0; }
       .workflow { grid-template-columns: 1fr; }
       .results-actions { flex-direction: column; }
+      .pitches { grid-template-columns: 1fr; }
     }
 
     @media (max-width: 540px) {
@@ -668,6 +796,10 @@
       .hero-stats strong { font-size: 19px; }
       .hero-stats div { padding: 9px 7px; }
       .main-nav { top: 5px; }
+      .pitch-section { padding: 14px; }
+      .pitch-player { width: 72px; }
+      .pitch-avatar { width: 44px; height: 44px; }
+      .pitch-player-name { max-width: 72px; font-size: 10px; }
     }
   </style>
 </head>
@@ -708,6 +840,14 @@
         <div class="field-group field-name">
           <label for="rosterName">Nombre</label>
           <input id="rosterName" type="text" maxlength="40" placeholder="Nombre del jugador">
+        </div>
+        <div class="field-group photo-field">
+          <label for="rosterPhoto">Foto</label>
+          <div class="photo-picker">
+            <img class="photo-preview" id="rosterPhotoPreview" src="logo-club-amigos-de-la-pena.png" alt="Vista previa de la foto">
+            <label class="btn btn-outline" for="rosterPhoto">Elegir</label>
+            <input id="rosterPhoto" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+          </div>
         </div>
         <div class="field-group">
           <label for="rosterPrimary">Posición principal</label>
@@ -797,7 +937,7 @@ Lista del domingo
         <button class="btn btn-secondary" id="clearBtn">Borrar todo</button>
       </div>
 
-      <p class="help">Reglas tácticas: con 11 jugadores, 4-4-2 o 4-3-3; con 10 jugadores, 3-4-2 o 3-3-3. El portero no se incluye en esos números. El generador elige la opción que mejor encaja con las posiciones guardadas.</p>
+      <p class="help">Reglas tácticas: con 11 jugadores, 4-4-2 o 4-3-3; con 10, 3-4-2 o 3-3-3; con 9, 3-3-2 o 3-2-3. Para grupos menores se usa una estructura proporcional. El portero no se incluye en esos números. El generador asigna una posición de campo a cada jugador y adapta primero a quienes tengan esa posición como secundaria.</p>
 
       <p class="status" id="status"></p>
       <div class="reserve-card" id="reserveCard"></div>
@@ -822,6 +962,22 @@ Lista del domingo
         <ul class="team-list" id="teamB"></ul>
         <div class="team-summary" id="summaryB"></div>
       </article>
+    </section>
+    <section class="pitch-section" id="pitchSection">
+      <div class="pitch-section-title">
+        <h2>Formaciones en el campo</h2>
+        <span class="badge">Posiciones asignadas</span>
+      </div>
+      <div class="pitches">
+        <article class="pitch-card blue">
+          <header><span>Equipo Azul</span><span id="pitchFormationA"></span></header>
+          <div class="football-pitch" id="pitchA"></div>
+        </article>
+        <article class="pitch-card white">
+          <header><span>Equipo Blanco</span><span id="pitchFormationB"></span></header>
+          <div class="football-pitch" id="pitchB"></div>
+        </article>
+      </div>
     </section>
     <div class="results-actions" id="resultsActions">
       <button class="btn btn-primary" id="copyLineupBtn">Copiar alineación para WhatsApp</button>
@@ -874,6 +1030,7 @@ Lista del domingo
     const rosterStatusEl = document.getElementById("rosterStatus");
     const matchHistoryEl = document.getElementById("matchHistory");
     const matchStatusEl = document.getElementById("matchStatus");
+    const pitchSectionEl = document.getElementById("pitchSection");
 
     let lastSolutions = [];
     let lastSolutionIndex = 0;
@@ -881,6 +1038,7 @@ Lista del domingo
     let isRestoring = false;
     let editingRosterIndex = -1;
     let editingMatchIndex = -1;
+    let pendingRosterPhoto = "";
 
     const autoBackupKey = "club-amigos-pena-jugadores-v1";
     const manualBackupKey = "club-amigos-pena-plantilla-v1";
@@ -902,6 +1060,29 @@ Lista del domingo
       10: [
         { label: "3-4-2", slots: { P: 1, D: 3, M: 4, A: 2 } },
         { label: "3-3-3", slots: { P: 1, D: 3, M: 3, A: 3 } }
+      ],
+      9: [
+        { label: "3-3-2", slots: { P: 1, D: 3, M: 3, A: 2 } },
+        { label: "3-2-3", slots: { P: 1, D: 3, M: 2, A: 3 } }
+      ],
+      8: [
+        { label: "3-2-2", slots: { P: 1, D: 3, M: 2, A: 2 } },
+        { label: "2-3-2", slots: { P: 1, D: 2, M: 3, A: 2 } }
+      ],
+      7: [
+        { label: "2-3-1", slots: { P: 1, D: 2, M: 3, A: 1 } },
+        { label: "3-2-1", slots: { P: 1, D: 3, M: 2, A: 1 } }
+      ],
+      6: [
+        { label: "2-2-1", slots: { P: 1, D: 2, M: 2, A: 1 } },
+        { label: "1-3-1", slots: { P: 1, D: 1, M: 3, A: 1 } }
+      ],
+      5: [
+        { label: "2-1-1", slots: { P: 1, D: 2, M: 1, A: 1 } },
+        { label: "1-2-1", slots: { P: 1, D: 1, M: 2, A: 1 } }
+      ],
+      4: [
+        { label: "1-1-1", slots: { P: 1, D: 1, M: 1, A: 1 } }
       ]
     };
 
@@ -984,6 +1165,7 @@ Lista del domingo
       resultsEl.classList.remove("visible");
       balanceBoxEl.classList.remove("visible");
       reserveCardEl.classList.remove("visible");
+      pitchSectionEl.classList.remove("visible");
       statusEl.textContent = "";
       statusEl.className = "status";
       lastSolutions = [];
@@ -1001,12 +1183,18 @@ Lista del domingo
     }
 
     function getPlayerRowsForBackup() {
-      return [...playersEl.querySelectorAll(".player-row")].map(row => ({
-        name: row.querySelector(".name-input").value.trim(),
-        primary: row.querySelector(".primary-position").value,
-        secondary: row.querySelector(".secondary-position").value,
-        quality: Number(row.querySelector(".quality-input").value)
-      }));
+      const savedPlayers = readBackup(manualBackupKey) || [];
+      const savedByName = new Map(savedPlayers.map(player => [normalizePlayerName(player.name), player]));
+      return [...playersEl.querySelectorAll(".player-row")].map(row => {
+        const name = row.querySelector(".name-input").value.trim();
+        return {
+          name,
+          primary: row.querySelector(".primary-position").value,
+          secondary: row.querySelector(".secondary-position").value,
+          quality: Number(row.querySelector(".quality-input").value),
+          photo: savedByName.get(normalizePlayerName(name))?.photo || ""
+        };
+      });
     }
 
     function saveAutomaticBackup() {
@@ -1075,7 +1263,10 @@ Lista del domingo
         name: String(player?.name || "").trim(),
         primary: String(player?.primary || "M").toUpperCase(),
         secondary: String(player?.secondary || "-").toUpperCase(),
-        quality: Number(player?.quality)
+        quality: Number(player?.quality),
+        photo: typeof player?.photo === "string" && /^data:image\/(?:jpeg|png|webp);base64,/i.test(player.photo)
+          ? player.photo
+          : ""
       }));
 
       const isValid = players.every(player =>
@@ -1193,11 +1384,43 @@ Lista del domingo
 
     function resetRosterForm() {
       editingRosterIndex = -1;
+      pendingRosterPhoto = "";
       document.getElementById("rosterName").value = "";
       document.getElementById("rosterPrimary").value = "M";
       document.getElementById("rosterSecondary").value = "-";
       document.getElementById("rosterQuality").value = "3";
+      document.getElementById("rosterPhoto").value = "";
+      document.getElementById("rosterPhotoPreview").src = "logo-club-amigos-de-la-pena.png";
       document.getElementById("addRosterPlayerBtn").textContent = "Guardar jugador";
+    }
+
+    function playerInitials(name) {
+      return String(name).split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join("").toUpperCase();
+    }
+
+    function compressPlayerPhoto(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.addEventListener("error", reject);
+        reader.addEventListener("load", () => {
+          const image = new Image();
+          image.addEventListener("error", reject);
+          image.addEventListener("load", () => {
+            const size = 180;
+            const canvas = document.createElement("canvas");
+            canvas.width = size;
+            canvas.height = size;
+            const context = canvas.getContext("2d");
+            const scale = Math.max(size / image.width, size / image.height);
+            const width = image.width * scale;
+            const height = image.height * scale;
+            context.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
+            resolve(canvas.toDataURL("image/jpeg", .78));
+          });
+          image.src = reader.result;
+        });
+        reader.readAsDataURL(file);
+      });
     }
 
     function renderRoster() {
@@ -1212,6 +1435,7 @@ Lista del domingo
 
       rosterListEl.innerHTML = players.map((player, index) => `
         <div class="roster-item">
+          <span class="roster-avatar">${player.photo ? `<img src="${player.photo}" alt="">` : escapeHtml(playerInitials(player.name))}</span>
           <div>
             <div class="player-name">${escapeHtml(player.name)}</div>
             <div class="roster-details">
@@ -1240,7 +1464,8 @@ Lista del domingo
         name,
         primary: document.getElementById("rosterPrimary").value,
         secondary: document.getElementById("rosterSecondary").value,
-        quality: Number(document.getElementById("rosterQuality").value)
+        quality: Number(document.getElementById("rosterQuality").value),
+        photo: pendingRosterPhoto
       };
       const players = readBackup(manualBackupKey) || [];
       const duplicateIndex = players.findIndex((item, index) =>
@@ -1274,6 +1499,8 @@ Lista del domingo
       document.getElementById("rosterPrimary").value = player.primary;
       document.getElementById("rosterSecondary").value = player.secondary;
       document.getElementById("rosterQuality").value = String(player.quality);
+      pendingRosterPhoto = player.photo || "";
+      document.getElementById("rosterPhotoPreview").src = pendingRosterPhoto || "logo-club-amigos-de-la-pena.png";
       document.getElementById("addRosterPlayerBtn").textContent = "Guardar cambios";
       document.getElementById("rosterName").focus();
     }
@@ -1541,6 +1768,87 @@ Lista del domingo
         .sort((a, b) => a.score - b.score)[0];
     }
 
+    function adaptationCost(player, position) {
+      if (player.primary === position) return 0;
+      if (player.secondary === position) return 3;
+      const transitions = {
+        D: { M: 10, A: 26, P: 34 },
+        M: { D: 12, A: 12, P: 34 },
+        A: { M: 10, D: 26, P: 34 },
+        P: { D: 28, M: 30, A: 34 }
+      };
+      return transitions[player.primary]?.[position] ?? 30;
+    }
+
+    function assignPlayersToFormation(team, formation) {
+      if (!formation) {
+        return team.map(player => ({ ...player, assignedPosition: player.primary }));
+      }
+
+      const goalkeeperCandidates = team.filter(player => playerCanCover(player, "P"));
+      const goalkeeper = goalkeeperCandidates.length
+        ? [...goalkeeperCandidates].sort((a, b) => adaptationCost(a, "P") - adaptationCost(b, "P") || b.quality - a.quality)[0]
+        : [...team].sort((a, b) => b.id - a.id)[0];
+      const outfieldPlayers = team.filter(player => player.id !== goalkeeper.id);
+      const slots = [];
+      ["D", "M", "A"].forEach(position => {
+        for (let i = 0; i < formation.slots[position]; i++) slots.push(position);
+      });
+
+      const memo = new Map();
+      const choices = new Map();
+
+      function solveAssignment(playerIndex, usedMask) {
+        if (playerIndex === outfieldPlayers.length) return 0;
+        const key = `${playerIndex}:${usedMask}`;
+        if (memo.has(key)) return memo.get(key);
+
+        let bestCost = Infinity;
+        let bestSlot = -1;
+        for (let slotIndex = 0; slotIndex < slots.length; slotIndex++) {
+          if (usedMask & (1 << slotIndex)) continue;
+          const cost = adaptationCost(outfieldPlayers[playerIndex], slots[slotIndex]) +
+            solveAssignment(playerIndex + 1, usedMask | (1 << slotIndex));
+          if (cost < bestCost) {
+            bestCost = cost;
+            bestSlot = slotIndex;
+          }
+        }
+
+        memo.set(key, bestCost);
+        choices.set(key, bestSlot);
+        return bestCost;
+      }
+
+      solveAssignment(0, 0);
+      let usedMask = 0;
+      const assigned = outfieldPlayers.map((player, playerIndex) => {
+        const key = `${playerIndex}:${usedMask}`;
+        const slotIndex = choices.get(key);
+        usedMask |= 1 << slotIndex;
+        return { ...player, assignedPosition: slots[slotIndex] };
+      });
+
+      return [
+        { ...goalkeeper, assignedPosition: "P", rotatingGoalkeeper: !goalkeeperCandidates.length },
+        ...assigned
+      ];
+    }
+
+    function assignedTeamStats(team) {
+      const stats = {
+        quality: 0,
+        average: 0,
+        P: 0, D: 0, M: 0, A: 0
+      };
+      team.forEach(player => {
+        stats.quality += player.quality;
+        stats[player.assignedPosition || player.primary] += 1;
+      });
+      stats.average = team.length ? stats.quality / team.length : 0;
+      return stats;
+    }
+
     function goalkeeperRotation(team) {
       if (team.some(player => playerCanCover(player, "P"))) return [];
       return [...team].sort((a, b) => b.id - a.id);
@@ -1556,6 +1864,11 @@ Lista del domingo
       const formationB = chooseFormation(teamB);
       if (formationA) score += formationA.score;
       if (formationB) score += formationB.score;
+      if (formationA && formationB) {
+        // Además de minimizar las adaptaciones totales, reparte su coste
+        // para que ninguna equipa quede tácticamente mucho peor armada.
+        score += Math.abs(formationA.score - formationB.score) * 0.65;
+      }
 
       // El nivel total es el criterio principal. Cuando un equipo tiene
       // un jugador menos, suele recibir jugadores con un nivel más alto.
@@ -1712,19 +2025,24 @@ Lista del domingo
     }
 
     function renderSolution(solution) {
-      currentRenderedSolution = solution;
-      const teamA = [...solution.teamA].sort(sortPlayers);
-      const teamB = [...solution.teamB].sort(sortPlayers);
-      const statsA = teamStats(teamA);
-      const statsB = teamStats(teamB);
+      const formationA = chooseFormation(solution.teamA);
+      const formationB = chooseFormation(solution.teamB);
+      const teamA = assignPlayersToFormation(solution.teamA, formationA).sort(sortPlayers);
+      const teamB = assignPlayersToFormation(solution.teamB, formationB).sort(sortPlayers);
+      const statsA = assignedTeamStats(teamA);
+      const statsB = assignedTeamStats(teamB);
+      currentRenderedSolution = { teamA, teamB, formationA, formationB };
 
       renderTeam("teamA", teamA);
       renderTeam("teamB", teamB);
+      renderPitch("pitchA", teamA);
+      renderPitch("pitchB", teamB);
+      document.getElementById("pitchFormationA").textContent = formationA?.label || "";
+      document.getElementById("pitchFormationB").textContent = formationB?.label || "";
+      pitchSectionEl.classList.add("visible");
 
       document.getElementById("scoreA").textContent = `${statsA.quality} puntos`;
       document.getElementById("scoreB").textContent = `${statsB.quality} puntos`;
-      const formationA = chooseFormation(teamA);
-      const formationB = chooseFormation(teamB);
       document.getElementById("summaryA").innerHTML = summaryHtml(statsA, teamA.length, formationA, teamA);
       document.getElementById("summaryB").innerHTML = summaryHtml(statsB, teamB.length, formationB, teamB);
 
@@ -1748,11 +2066,11 @@ Lista del domingo
       if (!currentRenderedSolution) return "";
       const teamA = [...currentRenderedSolution.teamA].sort(sortPlayers);
       const teamB = [...currentRenderedSolution.teamB].sort(sortPlayers);
-      const formationA = chooseFormation(teamA);
-      const formationB = chooseFormation(teamB);
+      const formationA = currentRenderedSolution.formationA;
+      const formationB = currentRenderedSolution.formationB;
       const formatTeam = (title, team, formation) => [
         `*${title}*${formation ? ` · ${formation.label}` : ""}`,
-        ...team.map(player => `${player.primary} · ${player.name}`),
+        ...team.map(player => `${player.assignedPosition || player.primary} · ${player.name}`),
         ...(!team.some(player => playerCanCover(player, "P"))
           ? [`Portería: ${goalkeeperRotation(team).map(player => player.name).join(" → ")}`]
           : [])
@@ -1786,21 +2104,55 @@ Lista del domingo
 
     function sortPlayers(a, b) {
       const order = { P: 0, D: 1, M: 2, A: 3 };
-      return order[a.primary] - order[b.primary] || b.quality - a.quality || a.name.localeCompare(b.name);
+      const positionA = a.assignedPosition || a.primary;
+      const positionB = b.assignedPosition || b.primary;
+      return order[positionA] - order[positionB] || b.quality - a.quality || a.name.localeCompare(b.name);
     }
 
     function renderTeam(elementId, team) {
       const el = document.getElementById(elementId);
       el.innerHTML = team.map(player => `
         <li>
-          <span class="position-pill" title="${positionNames[player.primary]}">${player.primary}</span>
+          <span class="position-pill" title="${positionNames[player.assignedPosition || player.primary]}">${player.assignedPosition || player.primary}</span>
           <span>
             <span class="player-name">${escapeHtml(player.name)}</span>
-            ${player.secondary !== "-" ? `<br><small style="color:#68738a">También juega de ${positionNames[player.secondary].toLowerCase()}</small>` : ""}
+            ${player.rotatingGoalkeeper
+              ? '<br><small style="color:#55d6ea">Empieza la rotación en portería</small>'
+              : player.assignedPosition !== player.primary
+                ? `<br><small style="color:#55d6ea">${player.secondary === player.assignedPosition ? "Posición secundaria" : "Adaptado"}: ${positionNames[player.assignedPosition].toLowerCase()}</small>`
+                : player.secondary !== "-"
+                  ? `<br><small style="color:#8292a8">También juega de ${positionNames[player.secondary].toLowerCase()}</small>`
+                  : ""}
           </span>
           <span class="quality">Nivel ${player.quality}</span>
         </li>
       `).join("");
+    }
+
+    function renderPitch(elementId, team) {
+      const pitch = document.getElementById(elementId);
+      const rows = {
+        P: { top: 88, players: [] },
+        D: { top: 68, players: [] },
+        M: { top: 43, players: [] },
+        A: { top: 18, players: [] }
+      };
+      team.forEach(player => rows[player.assignedPosition || player.primary].players.push(player));
+
+      pitch.innerHTML = Object.entries(rows).flatMap(([position, row]) =>
+        row.players.map((player, index) => {
+          const left = ((index + 1) / (row.players.length + 1)) * 100;
+          const avatar = player.photo
+            ? `<img src="${player.photo}" alt="">`
+            : escapeHtml(playerInitials(player.name));
+          return `
+            <div class="pitch-player" style="left:${left}%;top:${row.top}%" title="${positionNames[position]}">
+              <span class="pitch-avatar">${avatar}</span>
+              <span class="pitch-player-name">${escapeHtml(player.name)}</span>
+            </div>
+          `;
+        })
+      ).join("");
     }
 
     function summaryHtml(stats, size, formation, team) {
@@ -1817,6 +2169,17 @@ Lista del domingo
     document.getElementById("addRosterPlayerBtn").addEventListener("click", saveRosterPlayer);
     document.getElementById("rosterName").addEventListener("keydown", event => {
       if (event.key === "Enter") saveRosterPlayer();
+    });
+    document.getElementById("rosterPhoto").addEventListener("change", async event => {
+      const file = event.target.files[0];
+      if (!file) return;
+      try {
+        pendingRosterPhoto = await compressPlayerPhoto(file);
+        document.getElementById("rosterPhotoPreview").src = pendingRosterPhoto;
+        setRosterStatus("Foto preparada. Pulsa “Guardar jugador” para conservarla.", false);
+      } catch (_) {
+        setRosterStatus("No fue posible preparar esa foto.", true);
+      }
     });
     rosterListEl.addEventListener("click", event => {
       const button = event.target.closest("[data-roster-action]");
