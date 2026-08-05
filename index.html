@@ -405,22 +405,23 @@
 
     <section class="panel">
       <div class="panel-title">
-        <h2>Pegar lista</h2>
-        <span class="badge">Opcional</span>
+        <h2>Lista de WhatsApp</h2>
+        <span class="badge">Partido del domingo</span>
       </div>
       <div class="import-grid">
         <div>
-          <textarea id="bulkInput" placeholder="Ejemplo:
-1 - Ricardo D 3
-2 - Amet M 4
-3 - Fredy P 4
-4 - Uribe A 4"></textarea>
+          <textarea id="bulkInput" placeholder="Pega aquí el mensaje de WhatsApp. Ejemplo:
+Lista del domingo
+1. Ricardo ✅
+2. Amet
+3. Fredy
+4. Uribe"></textarea>
           <p class="help">
-            Admite formatos como “Ricardo D 3”, “Ricardo, D, 3” o “Ricardo - D - 3”.
-            P = portero, D = defensa, M = mediocampista y A = atacante.
+            La página busca cada nombre en la plantilla guardada y recupera automáticamente su posición y nivel.
+            Los jugadores nuevos se añaden como mediocampistas de nivel 3 para que puedas revisarlos.
           </p>
         </div>
-        <button class="btn btn-outline" id="importBtn">Importar jugadores</button>
+        <button class="btn btn-outline" id="importBtn">Crear lista del domingo</button>
       </div>
     </section>
 
@@ -449,7 +450,7 @@
         <button class="btn btn-secondary" id="clearBtn">Borrar todo</button>
       </div>
 
-      <p class="help">La lista se guarda automáticamente en este navegador. “Guardar plantilla” conserva una copia manual que podrás restaurar incluso después de borrar la lista.</p>
+      <p class="help">Primero registra los jugadores habituales y pulsa “Guardar plantilla”. Cada domingo podrás pegar solamente los nombres confirmados desde WhatsApp.</p>
 
       <p class="status" id="status"></p>
       <div class="reserve-card" id="reserveCard"></div>
@@ -704,20 +705,75 @@
       };
     }
 
+    function normalizePlayerName(name) {
+      return String(name)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+    }
+
+    function parseWhatsAppName(line) {
+      let clean = line.trim();
+      if (!clean) return null;
+
+      // Elimina numeración, viñetas, casillas y emojis habituales de confirmación.
+      clean = clean
+        .replace(/^[\s\d#*•·\-–—.)✅☑✔\uFE0F\u20E3]+/u, "")
+        .replace(/[\s✅☑✔👍⚽\uFE0F]+$/u, "")
+        .replace(/\s*\((?:confirmado|confirma|sí|si|voy|ok|x)\)\s*$/i, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      if (!clean || !/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(clean)) return null;
+      if (/^(lista|domingo|sábado|sabado|partido|juego|hora|lugar|campo|fecha|confirmados?|convocados?|suplentes?)(\b|:)/i.test(clean)) return null;
+      if (clean.length > 60) return null;
+
+      return clean;
+    }
+
     function importPlayers() {
       const lines = document.getElementById("bulkInput").value.split(/\r?\n/);
       const parsed = [];
-      const failed = [];
+      const newPlayers = [];
+      const seen = new Set();
+      const savedTemplate = readBackup(manualBackupKey);
+      const currentPlayers = getPlayerRowsForBackup().filter(player => player.name);
+      const catalogue = savedTemplate || currentPlayers;
+      const catalogueByName = new Map(
+        catalogue.map(player => [normalizePlayerName(player.name), player])
+      );
 
-      lines.forEach((line, index) => {
+      lines.forEach(line => {
         if (!line.trim()) return;
-        const player = parseBulkLine(line);
-        if (player) parsed.push(player);
-        else failed.push(index + 1);
+        const detailedPlayer = parseBulkLine(line);
+        if (detailedPlayer) {
+          const key = normalizePlayerName(detailedPlayer.name);
+          if (!seen.has(key)) {
+            parsed.push(detailedPlayer);
+            seen.add(key);
+          }
+          return;
+        }
+
+        const name = parseWhatsAppName(line);
+        if (!name) return;
+        const key = normalizePlayerName(name);
+        if (!key || seen.has(key)) return;
+
+        const savedPlayer = catalogueByName.get(key);
+        if (savedPlayer) {
+          parsed.push({ ...savedPlayer, name });
+        } else {
+          parsed.push({ name, primary: "M", secondary: "-", quality: 3 });
+          newPlayers.push(name);
+        }
+        seen.add(key);
       });
 
       if (!parsed.length) {
-        setStatus("No pude reconocer ningún jugador. Usa, por ejemplo: Ricardo D 3.", true);
+        setStatus("No pude reconocer nombres en el mensaje de WhatsApp.", true);
         return;
       }
 
@@ -728,10 +784,13 @@
       clearResults();
       saveAutomaticBackup();
 
-      if (failed.length) {
-        setStatus(`Importé ${parsed.length} jugadores. No reconocí las líneas: ${failed.join(", ")}.`, true);
+      if (newPlayers.length) {
+        setStatus(
+          `${parsed.length} jugadores añadidos. Revisa la posición y el nivel de los nuevos: ${newPlayers.join(", ")}.`,
+          true
+        );
       } else {
-        setStatus(`${parsed.length} jugadores importados correctamente.`, false);
+        setStatus(`${parsed.length} jugadores añadidos con sus posiciones y niveles guardados.`, false);
       }
     }
 
