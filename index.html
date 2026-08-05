@@ -83,6 +83,60 @@
       margin-bottom: 22px;
     }
 
+    .main-nav {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 7px;
+      margin-bottom: 22px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .nav-btn {
+      min-height: 46px;
+      border: 0;
+      border-radius: 11px;
+      color: var(--muted);
+      background: transparent;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .nav-btn.active {
+      color: #fff;
+      background: var(--primary);
+    }
+
+    .page { display: none; }
+    .page.active { display: block; }
+
+    .score-form {
+      display: grid;
+      grid-template-columns: 180px 130px 130px minmax(180px, 1fr) auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .match-history { display: grid; gap: 10px; margin-top: 18px; }
+
+    .match-item {
+      display: grid;
+      grid-template-columns: 140px minmax(170px, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      padding: 15px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: #fbfcff;
+    }
+
+    .match-date { font-weight: 900; }
+    .match-score { font-size: 20px; font-weight: 950; }
+    .match-notes { color: var(--muted); font-size: 13px; margin-top: 3px; }
+
     .panel-title {
       display: flex;
       justify-content: space-between;
@@ -430,6 +484,8 @@
       .results.visible { grid-template-columns: 1fr; }
       .roster-form { grid-template-columns: 1fr 1fr; }
       .roster-form .field-name { grid-column: 1 / -1; }
+      .score-form { grid-template-columns: 1fr 1fr; }
+      .score-form .field-notes { grid-column: 1 / -1; }
     }
 
     @media (max-width: 540px) {
@@ -446,6 +502,10 @@
       .roster-form { grid-template-columns: 1fr; }
       .roster-form .field-name { grid-column: auto; }
       .roster-item { grid-template-columns: 1fr; }
+      .main-nav { grid-template-columns: 1fr; }
+      .score-form { grid-template-columns: 1fr; }
+      .score-form .field-notes { grid-column: auto; }
+      .match-item { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -465,6 +525,13 @@
       <span class="badge">Funciona sin instalar</span>
     </section>
 
+    <nav class="main-nav" aria-label="Navegación principal">
+      <button class="nav-btn active" type="button" data-page="equipos">Crear equipos</button>
+      <button class="nav-btn" type="button" data-page="jugadores">Jugadores</button>
+      <button class="nav-btn" type="button" data-page="resultados">Resultados</button>
+    </nav>
+
+    <section class="page" id="page-jugadores">
     <section class="panel">
       <div class="panel-title">
         <h2>Plantilla de jugadores</h2>
@@ -504,7 +571,9 @@
       <div class="roster-list" id="rosterList"></div>
       <p class="help">Este cadastro alimenta automáticamente las listas de WhatsApp. El archivo JSON es solamente una copia de seguridad opcional.</p>
     </section>
+    </section>
 
+    <section class="page active" id="page-equipos">
     <section class="panel">
       <div class="panel-title">
         <h2>Lista de WhatsApp</h2>
@@ -582,6 +651,39 @@ Lista del domingo
         <div class="team-summary" id="summaryB"></div>
       </article>
     </section>
+    </section>
+
+    <section class="page" id="page-resultados">
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Registrar resultado</h2>
+          <span class="badge">Historial de partidos</span>
+        </div>
+
+        <div class="score-form">
+          <div class="field-group">
+            <label for="matchDate">Fecha</label>
+            <input id="matchDate" type="date">
+          </div>
+          <div class="field-group">
+            <label for="blueScore">Equipo Azul</label>
+            <input id="blueScore" type="number" min="0" max="99" inputmode="numeric" placeholder="0">
+          </div>
+          <div class="field-group">
+            <label for="whiteScore">Equipo Blanco</label>
+            <input id="whiteScore" type="number" min="0" max="99" inputmode="numeric" placeholder="0">
+          </div>
+          <div class="field-group field-notes">
+            <label for="matchNotes">Observaciones</label>
+            <input id="matchNotes" type="text" maxlength="120" placeholder="Opcional">
+          </div>
+          <button class="btn btn-primary" id="saveMatchBtn">Guardar resultado</button>
+        </div>
+
+        <p class="status" id="matchStatus"></p>
+        <div class="match-history" id="matchHistory"></div>
+      </section>
+    </section>
   </main>
 
   <script>
@@ -594,14 +696,18 @@ Lista del domingo
     const rosterListEl = document.getElementById("rosterList");
     const rosterCountEl = document.getElementById("rosterCount");
     const rosterStatusEl = document.getElementById("rosterStatus");
+    const matchHistoryEl = document.getElementById("matchHistory");
+    const matchStatusEl = document.getElementById("matchStatus");
 
     let lastSolutions = [];
     let lastSolutionIndex = 0;
     let isRestoring = false;
     let editingRosterIndex = -1;
+    let editingMatchIndex = -1;
 
     const autoBackupKey = "club-amigos-pena-jugadores-v1";
     const manualBackupKey = "club-amigos-pena-plantilla-v1";
+    const matchesKey = "club-amigos-pena-partidos-v1";
 
     const positionNames = {
       P: "Portero",
@@ -984,6 +1090,126 @@ Lista del domingo
       setRosterStatus(`${removed.name} eliminado de la plantilla.`, false);
     }
 
+    function readMatches() {
+      try {
+        const matches = JSON.parse(localStorage.getItem(matchesKey) || "[]");
+        return Array.isArray(matches) ? matches : [];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function formatMatchDate(date) {
+      if (!date) return "Sin fecha";
+      const [year, month, day] = date.split("-").map(Number);
+      return new Intl.DateTimeFormat("es", {
+        day: "2-digit", month: "short", year: "numeric"
+      }).format(new Date(year, month - 1, day));
+    }
+
+    function setMatchStatus(message, isError = false) {
+      matchStatusEl.textContent = message;
+      matchStatusEl.className = `status ${isError ? "error" : "ok"}`;
+    }
+
+    function resetMatchForm() {
+      editingMatchIndex = -1;
+      document.getElementById("matchDate").value = new Date().toISOString().slice(0, 10);
+      document.getElementById("blueScore").value = "";
+      document.getElementById("whiteScore").value = "";
+      document.getElementById("matchNotes").value = "";
+      document.getElementById("saveMatchBtn").textContent = "Guardar resultado";
+    }
+
+    function renderMatches() {
+      const matches = readMatches();
+      if (!matches.length) {
+        matchHistoryEl.innerHTML = '<p class="help">Todavía no hay partidos registrados.</p>';
+        return;
+      }
+
+      matchHistoryEl.innerHTML = matches.map((match, index) => `
+        <article class="match-item">
+          <div class="match-date">${formatMatchDate(match.date)}</div>
+          <div>
+            <div class="match-score">Azul ${match.blueScore} – ${match.whiteScore} Blanco</div>
+            ${match.notes ? `<div class="match-notes">${escapeHtml(match.notes)}</div>` : ""}
+          </div>
+          <div class="mini-actions">
+            <button class="btn btn-outline" type="button" data-match-action="edit" data-match-index="${index}">Editar</button>
+            <button class="btn btn-secondary" type="button" data-match-action="delete" data-match-index="${index}">Eliminar</button>
+          </div>
+        </article>
+      `).join("");
+    }
+
+    function saveMatch() {
+      const date = document.getElementById("matchDate").value;
+      const blueValue = document.getElementById("blueScore").value;
+      const whiteValue = document.getElementById("whiteScore").value;
+      if (!date || blueValue === "" || whiteValue === "") {
+        setMatchStatus("Indica la fecha y los goles de los dos equipos.", true);
+        return;
+      }
+
+      const match = {
+        date,
+        blueScore: Number(blueValue),
+        whiteScore: Number(whiteValue),
+        notes: document.getElementById("matchNotes").value.trim()
+      };
+      if (match.blueScore < 0 || match.whiteScore < 0 || match.blueScore > 99 || match.whiteScore > 99) {
+        setMatchStatus("El resultado debe estar entre 0 y 99 goles.", true);
+        return;
+      }
+
+      const matches = readMatches();
+      if (editingMatchIndex >= 0 && matches[editingMatchIndex]) {
+        matches[editingMatchIndex] = match;
+      } else {
+        matches.push(match);
+      }
+      matches.sort((a, b) => b.date.localeCompare(a.date));
+      localStorage.setItem(matchesKey, JSON.stringify(matches));
+      resetMatchForm();
+      renderMatches();
+      setMatchStatus("Resultado guardado correctamente.", false);
+    }
+
+    function editMatch(index) {
+      const match = readMatches()[index];
+      if (!match) return;
+      editingMatchIndex = index;
+      document.getElementById("matchDate").value = match.date;
+      document.getElementById("blueScore").value = String(match.blueScore);
+      document.getElementById("whiteScore").value = String(match.whiteScore);
+      document.getElementById("matchNotes").value = match.notes || "";
+      document.getElementById("saveMatchBtn").textContent = "Guardar cambios";
+    }
+
+    function deleteMatch(index) {
+      const matches = readMatches();
+      if (!matches[index]) return;
+      matches.splice(index, 1);
+      localStorage.setItem(matchesKey, JSON.stringify(matches));
+      resetMatchForm();
+      renderMatches();
+      setMatchStatus("Partido eliminado del historial.", false);
+    }
+
+    function showPage(pageName) {
+      const validPages = new Set(["equipos", "jugadores", "resultados"]);
+      const page = validPages.has(pageName) ? pageName : "equipos";
+      document.querySelectorAll(".page").forEach(element => {
+        element.classList.toggle("active", element.id === `page-${page}`);
+      });
+      document.querySelectorAll(".nav-btn").forEach(button => {
+        button.classList.toggle("active", button.dataset.page === page);
+      });
+      history.replaceState(null, "", `#${page}`);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
     function parseWhatsAppName(line) {
       let clean = line.trim();
       if (!clean) return null;
@@ -1317,12 +1543,26 @@ Lista del domingo
     document.getElementById("rosterFileInput").addEventListener("change", event => {
       importRosterFile(event.target.files[0]);
     });
+    document.getElementById("saveMatchBtn").addEventListener("click", saveMatch);
+    matchHistoryEl.addEventListener("click", event => {
+      const button = event.target.closest("[data-match-action]");
+      if (!button) return;
+      const index = Number(button.dataset.matchIndex);
+      if (button.dataset.matchAction === "edit") editMatch(index);
+      if (button.dataset.matchAction === "delete") deleteMatch(index);
+    });
+    document.querySelectorAll(".nav-btn").forEach(button => {
+      button.addEventListener("click", () => showPage(button.dataset.page));
+    });
     document.getElementById("clearBtn").addEventListener("click", clearAll);
     document.getElementById("importBtn").addEventListener("click", importPlayers);
 
     // Restaura la última lista automáticamente; si no existe, crea filas vacías.
     const automaticBackup = readBackup(autoBackupKey);
     renderRoster();
+    resetMatchForm();
+    renderMatches();
+    showPage(location.hash.replace("#", "") || "equipos");
     if (automaticBackup) {
       applyBackup(automaticBackup);
     } else {
