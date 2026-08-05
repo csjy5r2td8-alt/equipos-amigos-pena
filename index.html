@@ -112,6 +112,63 @@
       align-items: stretch;
     }
 
+    .roster-form {
+      display: grid;
+      grid-template-columns: minmax(190px, 1fr) 160px 160px 110px auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .field-group {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field-group label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .field-group input,
+    .field-group select {
+      width: 100%;
+      height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0 11px;
+      color: var(--text);
+      background: #fff;
+      outline: none;
+    }
+
+    .roster-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .roster-item {
+      display: grid;
+      grid-template-columns: minmax(150px, 1fr) auto auto;
+      gap: 12px;
+      align-items: center;
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: #fbfcff;
+    }
+
+    .roster-details {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .mini-actions { display: flex; gap: 7px; }
+    .mini-actions .btn { min-height: 36px; padding: 0 11px; font-size: 13px; }
+
     textarea {
       width: 100%;
       min-height: 112px;
@@ -371,6 +428,8 @@
       }
       .player-row .name-input { grid-column: 1 / -1; }
       .results.visible { grid-template-columns: 1fr; }
+      .roster-form { grid-template-columns: 1fr 1fr; }
+      .roster-form .field-name { grid-column: 1 / -1; }
     }
 
     @media (max-width: 540px) {
@@ -384,6 +443,9 @@
       .actions .btn { flex: 1 1 100%; }
       .brand { align-items: flex-start; gap: 12px; }
       .club-logo { width: 66px; height: 82px; }
+      .roster-form { grid-template-columns: 1fr; }
+      .roster-form .field-name { grid-column: auto; }
+      .roster-item { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -401,6 +463,46 @@
         </div>
       </div>
       <span class="badge">Funciona sin instalar</span>
+    </section>
+
+    <section class="panel">
+      <div class="panel-title">
+        <h2>Plantilla de jugadores</h2>
+        <span class="badge" id="rosterCount">0 guardados</span>
+      </div>
+
+      <div class="roster-form">
+        <div class="field-group field-name">
+          <label for="rosterName">Nombre</label>
+          <input id="rosterName" type="text" maxlength="40" placeholder="Nombre del jugador">
+        </div>
+        <div class="field-group">
+          <label for="rosterPrimary">Posición principal</label>
+          <select id="rosterPrimary">
+            <option value="P">Portero</option><option value="D">Defensa</option>
+            <option value="M" selected>Mediocampista</option><option value="A">Atacante</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label for="rosterSecondary">Posición secundaria</label>
+          <select id="rosterSecondary">
+            <option value="-">Ninguna</option><option value="P">Portero</option>
+            <option value="D">Defensa</option><option value="M">Mediocampista</option><option value="A">Atacante</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label for="rosterQuality">Nivel</label>
+          <select id="rosterQuality">
+            <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option>
+            <option value="4">4</option><option value="5">5</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" id="addRosterPlayerBtn">Guardar jugador</button>
+      </div>
+
+      <p class="status" id="rosterStatus"></p>
+      <div class="roster-list" id="rosterList"></div>
+      <p class="help">Este cadastro alimenta automáticamente las listas de WhatsApp. El archivo JSON es solamente una copia de seguridad opcional.</p>
     </section>
 
     <section class="panel">
@@ -489,10 +591,14 @@ Lista del domingo
     const resultsEl = document.getElementById("results");
     const reserveCardEl = document.getElementById("reserveCard");
     const balanceBoxEl = document.getElementById("balanceBox");
+    const rosterListEl = document.getElementById("rosterList");
+    const rosterCountEl = document.getElementById("rosterCount");
+    const rosterStatusEl = document.getElementById("rosterStatus");
 
     let lastSolutions = [];
     let lastSolutionIndex = 0;
     let isRestoring = false;
+    let editingRosterIndex = -1;
 
     const autoBackupKey = "club-amigos-pena-jugadores-v1";
     const manualBackupKey = "club-amigos-pena-plantilla-v1";
@@ -638,6 +744,7 @@ Lista del domingo
 
       try {
         localStorage.setItem(manualBackupKey, JSON.stringify(players));
+        renderRoster();
         setStatus(`Plantilla guardada con ${players.length} jugadores.`, false);
       } catch (_) {
         setStatus("El navegador no permitió guardar la plantilla.", true);
@@ -718,6 +825,7 @@ Lista del domingo
           if (!players) throw new Error("invalid");
           localStorage.setItem(manualBackupKey, JSON.stringify(players));
           applyBackup(players);
+          renderRoster();
           setStatus(`Archivo importado: ${players.length} jugadores guardados en la plantilla.`, false);
         } catch (_) {
           setStatus("El archivo no contiene una plantilla de jugadores válida.", true);
@@ -774,6 +882,106 @@ Lista del domingo
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, " ")
         .trim();
+    }
+
+    function setRosterStatus(message, isError = false) {
+      rosterStatusEl.textContent = message;
+      rosterStatusEl.className = `status ${isError ? "error" : "ok"}`;
+    }
+
+    function resetRosterForm() {
+      editingRosterIndex = -1;
+      document.getElementById("rosterName").value = "";
+      document.getElementById("rosterPrimary").value = "M";
+      document.getElementById("rosterSecondary").value = "-";
+      document.getElementById("rosterQuality").value = "3";
+      document.getElementById("addRosterPlayerBtn").textContent = "Guardar jugador";
+    }
+
+    function renderRoster() {
+      const players = readBackup(manualBackupKey) || [];
+      rosterCountEl.textContent = `${players.length} ${players.length === 1 ? "guardado" : "guardados"}`;
+
+      if (!players.length) {
+        rosterListEl.innerHTML = '<p class="help">Todavía no hay jugadores guardados en la plantilla.</p>';
+        return;
+      }
+
+      rosterListEl.innerHTML = players.map((player, index) => `
+        <div class="roster-item">
+          <div>
+            <div class="player-name">${escapeHtml(player.name)}</div>
+            <div class="roster-details">
+              ${positionNames[player.primary]} · ${player.secondary === "-" ? "Sin posición secundaria" : positionNames[player.secondary] + " como secundaria"} · Nivel ${player.quality}
+            </div>
+          </div>
+          <span class="quality">Nivel ${player.quality}</span>
+          <div class="mini-actions">
+            <button class="btn btn-outline" type="button" data-roster-action="edit" data-roster-index="${index}">Editar</button>
+            <button class="btn btn-secondary" type="button" data-roster-action="delete" data-roster-index="${index}">Eliminar</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function saveRosterPlayer() {
+      const name = document.getElementById("rosterName").value.trim();
+      if (!name) {
+        setRosterStatus("Escribe el nombre del jugador.", true);
+        document.getElementById("rosterName").focus();
+        return;
+      }
+
+      const player = {
+        name,
+        primary: document.getElementById("rosterPrimary").value,
+        secondary: document.getElementById("rosterSecondary").value,
+        quality: Number(document.getElementById("rosterQuality").value)
+      };
+      const players = readBackup(manualBackupKey) || [];
+      const duplicateIndex = players.findIndex((item, index) =>
+        index !== editingRosterIndex && normalizePlayerName(item.name) === normalizePlayerName(name)
+      );
+
+      if (duplicateIndex >= 0) {
+        setRosterStatus("Ese jugador ya existe en la plantilla.", true);
+        return;
+      }
+
+      if (editingRosterIndex >= 0 && players[editingRosterIndex]) {
+        players[editingRosterIndex] = player;
+        setRosterStatus(`${name} actualizado correctamente.`, false);
+      } else {
+        players.push(player);
+        setRosterStatus(`${name} añadido a la plantilla.`, false);
+      }
+
+      localStorage.setItem(manualBackupKey, JSON.stringify(players));
+      resetRosterForm();
+      renderRoster();
+    }
+
+    function editRosterPlayer(index) {
+      const players = readBackup(manualBackupKey) || [];
+      const player = players[index];
+      if (!player) return;
+      editingRosterIndex = index;
+      document.getElementById("rosterName").value = player.name;
+      document.getElementById("rosterPrimary").value = player.primary;
+      document.getElementById("rosterSecondary").value = player.secondary;
+      document.getElementById("rosterQuality").value = String(player.quality);
+      document.getElementById("addRosterPlayerBtn").textContent = "Guardar cambios";
+      document.getElementById("rosterName").focus();
+    }
+
+    function deleteRosterPlayer(index) {
+      const players = readBackup(manualBackupKey) || [];
+      const removed = players.splice(index, 1)[0];
+      if (!removed) return;
+      localStorage.setItem(manualBackupKey, JSON.stringify(players));
+      resetRosterForm();
+      renderRoster();
+      setRosterStatus(`${removed.name} eliminado de la plantilla.`, false);
     }
 
     function parseWhatsAppName(line) {
@@ -1087,6 +1295,17 @@ Lista del domingo
     }
 
     document.getElementById("addBtn").addEventListener("click", () => addPlayer());
+    document.getElementById("addRosterPlayerBtn").addEventListener("click", saveRosterPlayer);
+    document.getElementById("rosterName").addEventListener("keydown", event => {
+      if (event.key === "Enter") saveRosterPlayer();
+    });
+    rosterListEl.addEventListener("click", event => {
+      const button = event.target.closest("[data-roster-action]");
+      if (!button) return;
+      const index = Number(button.dataset.rosterIndex);
+      if (button.dataset.rosterAction === "edit") editRosterPlayer(index);
+      if (button.dataset.rosterAction === "delete") deleteRosterPlayer(index);
+    });
     document.getElementById("generateBtn").addEventListener("click", generateSolutions);
     document.getElementById("alternativeBtn").addEventListener("click", showAlternative);
     document.getElementById("saveBackupBtn").addEventListener("click", saveManualBackup);
@@ -1103,6 +1322,7 @@ Lista del domingo
 
     // Restaura la última lista automáticamente; si no existe, crea filas vacías.
     const automaticBackup = readBackup(autoBackupKey);
+    renderRoster();
     if (automaticBackup) {
       applyBackup(automaticBackup);
     } else {
