@@ -1438,11 +1438,9 @@ Lista del domingo
       const baseMatches = catalogue.filter(player => basePlayerName(player.name) === baseKey);
       if (baseMatches.length === 1) return baseMatches[0];
 
-      const partialMatches = catalogue.filter(player => {
-        const savedKey = basePlayerName(player.name);
-        return baseKey.startsWith(`${savedKey} `) || savedKey.startsWith(`${baseKey} `);
-      });
-      return partialMatches.length === 1 ? partialMatches[0] : null;
+      // No asociar por prefijo: "Juan" y "Juan Miguel" son personas distintas.
+      // Las aclaraciones entre paréntesis siguen funcionando mediante basePlayerName.
+      return null;
     }
 
     function setRosterStatus(message, isError = false) {
@@ -1553,9 +1551,11 @@ Lista del domingo
         needsReview: false
       };
       const players = readBackup(manualBackupKey) || [];
-      const duplicateIndex = players.findIndex((item, index) =>
-        index !== editingRosterIndex && normalizePlayerName(item.name) === normalizePlayerName(name)
-      );
+      const duplicateIndex = players.findIndex((item, index) => {
+        if (index === editingRosterIndex) return false;
+        return normalizePlayerName(item.name) === normalizePlayerName(name) ||
+          basePlayerName(item.name) === basePlayerName(name);
+      });
 
       if (duplicateIndex >= 0) {
         setRosterStatus("Ese jugador ya existe en la plantilla.", true);
