@@ -204,6 +204,29 @@
       margin-top: 18px;
     }
 
+    .roster-filters {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) minmax(180px, 260px);
+      gap: 12px;
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, .03);
+    }
+
+    .roster-filters input,
+    .roster-filters select {
+      width: 100%;
+      height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0 12px;
+      color: var(--text);
+      background: #fff;
+      outline: none;
+    }
+
     .roster-item {
       display: grid;
       grid-template-columns: 48px minmax(150px, 1fr) auto auto;
@@ -552,6 +575,7 @@
       .club-logo { width: 66px; height: 82px; }
       .roster-form { grid-template-columns: 1fr; }
       .roster-form .field-name { grid-column: auto; }
+      .roster-filters { grid-template-columns: 1fr; }
       .roster-item { grid-template-columns: 1fr; }
       .main-nav { grid-template-columns: 1fr; }
       .score-form { grid-template-columns: 1fr; }
@@ -913,6 +937,22 @@
       </div>
 
       <p class="status" id="rosterStatus"></p>
+      <div class="roster-filters" aria-label="Filtros de jugadores">
+        <div class="field-group">
+          <label for="rosterNameFilter">Buscar por nombre</label>
+          <input id="rosterNameFilter" type="search" placeholder="Escribe al menos 3 letras" autocomplete="off">
+        </div>
+        <div class="field-group">
+          <label for="rosterPositionFilter">Filtrar por posición</label>
+          <select id="rosterPositionFilter">
+            <option value="">Todas las posiciones</option>
+            <option value="P">Portero</option>
+            <option value="D">Defensa</option>
+            <option value="M">Mediocampista</option>
+            <option value="A">Atacante</option>
+          </select>
+        </div>
+      </div>
       <div class="roster-list" id="rosterList"></div>
       <p class="help">Este cadastro alimenta automáticamente las listas de WhatsApp. El archivo JSON es solamente una copia de seguridad opcional.</p>
     </section>
@@ -1067,6 +1107,8 @@ Lista del domingo
     const rosterListEl = document.getElementById("rosterList");
     const rosterCountEl = document.getElementById("rosterCount");
     const rosterStatusEl = document.getElementById("rosterStatus");
+    const rosterNameFilterEl = document.getElementById("rosterNameFilter");
+    const rosterPositionFilterEl = document.getElementById("rosterPositionFilter");
     const matchHistoryEl = document.getElementById("matchHistory");
     const matchStatusEl = document.getElementById("matchStatus");
     const pitchSectionEl = document.getElementById("pitchSection");
@@ -1505,7 +1547,21 @@ Lista del domingo
 
     function renderRoster() {
       const players = readBackup(manualBackupKey) || [];
-      rosterCountEl.textContent = `${players.length} ${players.length === 1 ? "guardado" : "guardados"}`;
+      const typedName = normalizePlayerName(rosterNameFilterEl.value);
+      const nameFilter = typedName.length >= 3 ? typedName : "";
+      const positionFilter = rosterPositionFilterEl.value;
+      const visiblePlayers = players
+        .map((player, index) => ({ player, index }))
+        .filter(({ player }) => {
+          const matchesName = !nameFilter || normalizePlayerName(player.name).includes(nameFilter);
+          const matchesPosition = !positionFilter ||
+            player.primary === positionFilter || player.secondary === positionFilter;
+          return matchesName && matchesPosition;
+        });
+
+      rosterCountEl.textContent = visiblePlayers.length === players.length
+        ? `${players.length} ${players.length === 1 ? "guardado" : "guardados"}`
+        : `${visiblePlayers.length} de ${players.length}`;
 
       if (!players.length) {
         rosterListEl.innerHTML = '<p class="help">Todavía no hay jugadores guardados en la plantilla.</p>';
@@ -1513,7 +1569,13 @@ Lista del domingo
         return;
       }
 
-      rosterListEl.innerHTML = players.map((player, index) => `
+      if (!visiblePlayers.length) {
+        rosterListEl.innerHTML = '<p class="help">No hay jugadores que coincidan con estos filtros.</p>';
+        updateDashboardMetrics();
+        return;
+      }
+
+      rosterListEl.innerHTML = visiblePlayers.map(({ player, index }) => `
         <div class="roster-item${player.needsReview ? " needs-review" : ""}">
           <span class="roster-avatar">${player.photo ? `<img src="${player.photo}" alt="">` : escapeHtml(playerInitials(player.name))}</span>
           <div>
@@ -2288,6 +2350,8 @@ Lista del domingo
 
     document.getElementById("addBtn").addEventListener("click", () => addPlayer());
     document.getElementById("addRosterPlayerBtn").addEventListener("click", saveRosterPlayer);
+    rosterNameFilterEl.addEventListener("input", renderRoster);
+    rosterPositionFilterEl.addEventListener("change", renderRoster);
     document.getElementById("rosterName").addEventListener("keydown", event => {
       if (event.key === "Enter") saveRosterPlayer();
     });
