@@ -1124,6 +1124,7 @@ Lista del domingo
     function addPlayer(player = {}) {
       const row = document.createElement("div");
       row.className = "player-row";
+      row.dataset.playerPhoto = player.photo || "";
       row.innerHTML = `
         <input class="name-input" type="text" maxlength="40" placeholder="Nombre del jugador" value="${escapeHtml(player.name || "")}">
         <select class="primary-position">${positionOptions(false)}</select>
@@ -1218,7 +1219,7 @@ Lista del domingo
           primary: row.querySelector(".primary-position").value,
           secondary: row.querySelector(".secondary-position").value,
           quality: Number(row.querySelector(".quality-input").value),
-          photo: savedByName.get(normalizePlayerName(name))?.photo || ""
+          photo: row.dataset.playerPhoto || savedByName.get(normalizePlayerName(name))?.photo || ""
         };
       });
     }
@@ -1383,7 +1384,8 @@ Lista del domingo
           name,
           primary,
           secondary,
-          quality
+          quality,
+          photo: row.dataset.playerPhoto || ""
         });
       });
 
@@ -1401,6 +1403,30 @@ Lista del domingo
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, " ")
         .trim();
+    }
+
+    function basePlayerName(name) {
+      return normalizePlayerName(
+        String(name)
+          .replace(/\s*\([^)]*\)\s*/g, " ")
+          .replace(/\s*[-–—]\s*(?:invitado|invitada|guest|amigo)\b.*$/i, " ")
+      );
+    }
+
+    function findSavedPlayer(name, catalogue) {
+      const exactKey = normalizePlayerName(name);
+      const exact = catalogue.find(player => normalizePlayerName(player.name) === exactKey);
+      if (exact) return exact;
+
+      const baseKey = basePlayerName(name);
+      const baseMatches = catalogue.filter(player => basePlayerName(player.name) === baseKey);
+      if (baseMatches.length === 1) return baseMatches[0];
+
+      const partialMatches = catalogue.filter(player => {
+        const savedKey = basePlayerName(player.name);
+        return baseKey.startsWith(`${savedKey} `) || savedKey.startsWith(`${baseKey} `);
+      });
+      return partialMatches.length === 1 ? partialMatches[0] : null;
     }
 
     function setRosterStatus(message, isError = false) {
@@ -1700,13 +1726,11 @@ Lista del domingo
       const lines = document.getElementById("bulkInput").value.split(/\r?\n/);
       const parsed = [];
       const newPlayers = [];
+      let matchedPlayers = 0;
       const seen = new Set();
       const savedTemplate = readBackup(manualBackupKey);
       const currentPlayers = getPlayerRowsForBackup().filter(player => player.name);
       const catalogue = savedTemplate || currentPlayers;
-      const catalogueByName = new Map(
-        catalogue.map(player => [normalizePlayerName(player.name), player])
-      );
 
       lines.forEach(line => {
         if (!line.trim()) return;
@@ -1715,11 +1739,12 @@ Lista del domingo
         const key = normalizePlayerName(name);
         if (!key || seen.has(key)) return;
 
-        const savedPlayer = catalogueByName.get(key);
+        const savedPlayer = findSavedPlayer(name, catalogue);
         if (savedPlayer) {
           parsed.push({ ...savedPlayer, name });
+          matchedPlayers += 1;
         } else {
-          parsed.push({ name, primary: "M", secondary: "-", quality: 3 });
+          parsed.push({ name, primary: "M", secondary: "-", quality: 3, photo: "" });
           newPlayers.push(name);
         }
         seen.add(key);
@@ -1739,11 +1764,11 @@ Lista del domingo
 
       if (newPlayers.length) {
         setStatus(
-          `${parsed.length} jugadores añadidos. Revisa la posición y el nivel de los nuevos: ${newPlayers.join(", ")}.`,
+          `${matchedPlayers} reconocidos en la plantilla y ${newPlayers.length} nuevos. Revisa: ${newPlayers.join(", ")}.`,
           true
         );
       } else {
-        setStatus(`${parsed.length} jugadores añadidos con sus posiciones y niveles guardados.`, false);
+        setStatus(`${matchedPlayers} jugadores reconocidos: posiciones, niveles y fotos recuperados.`, false);
       }
     }
 
