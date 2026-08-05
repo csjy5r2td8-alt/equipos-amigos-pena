@@ -219,6 +219,19 @@
       color: var(--muted);
       font-size: 13px;
     }
+    .new-player-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 9px;
+      border: 1px solid rgba(255, 201, 70, .45);
+      border-radius: 999px;
+      color: #ffd46a;
+      background: rgba(255, 201, 70, .12);
+      font-size: 11px;
+      font-weight: 950;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
     .roster-avatar {
       display: grid;
       width: 46px;
@@ -1214,12 +1227,14 @@ Lista del domingo
       const savedByName = new Map(savedPlayers.map(player => [normalizePlayerName(player.name), player]));
       return [...playersEl.querySelectorAll(".player-row")].map(row => {
         const name = row.querySelector(".name-input").value.trim();
+        const savedPlayer = savedByName.get(normalizePlayerName(name));
         return {
           name,
           primary: row.querySelector(".primary-position").value,
           secondary: row.querySelector(".secondary-position").value,
           quality: Number(row.querySelector(".quality-input").value),
-          photo: row.dataset.playerPhoto || savedByName.get(normalizePlayerName(name))?.photo || ""
+          photo: row.dataset.playerPhoto || savedPlayer?.photo || "",
+          needsReview: Boolean(savedPlayer?.needsReview)
         };
       });
     }
@@ -1291,6 +1306,7 @@ Lista del domingo
         primary: String(player?.primary || "M").toUpperCase(),
         secondary: String(player?.secondary || "-").toUpperCase(),
         quality: Number(player?.quality),
+        needsReview: Boolean(player?.needsReview),
         photo: typeof player?.photo === "string" && /^data:image\/(?:jpeg|png|webp);base64,/i.test(player.photo)
           ? player.photo
           : ""
@@ -1500,7 +1516,7 @@ Lista del domingo
       }
 
       rosterListEl.innerHTML = players.map((player, index) => `
-        <div class="roster-item">
+        <div class="roster-item${player.needsReview ? " needs-review" : ""}">
           <span class="roster-avatar">${player.photo ? `<img src="${player.photo}" alt="">` : escapeHtml(playerInitials(player.name))}</span>
           <div>
             <div class="player-name">${escapeHtml(player.name)}</div>
@@ -1508,7 +1524,9 @@ Lista del domingo
               ${positionNames[player.primary]} · ${player.secondary === "-" ? "Sin posición secundaria" : positionNames[player.secondary] + " como secundaria"} · Nivel ${player.quality}
             </div>
           </div>
-          <span class="quality">Nivel ${player.quality}</span>
+          ${player.needsReview
+            ? '<span class="new-player-badge">Nuevo · completar</span>'
+            : `<span class="quality">Nivel ${player.quality}</span>`}
           <div class="mini-actions">
             <button class="btn btn-outline" type="button" data-roster-action="edit" data-roster-index="${index}">Editar</button>
             <button class="btn btn-secondary" type="button" data-roster-action="delete" data-roster-index="${index}">Eliminar</button>
@@ -1531,7 +1549,8 @@ Lista del domingo
         primary: document.getElementById("rosterPrimary").value,
         secondary: document.getElementById("rosterSecondary").value,
         quality: Number(document.getElementById("rosterQuality").value),
-        photo: pendingRosterPhoto
+        photo: pendingRosterPhoto,
+        needsReview: false
       };
       const players = readBackup(manualBackupKey) || [];
       const duplicateIndex = players.findIndex((item, index) =>
@@ -1725,7 +1744,6 @@ Lista del domingo
     function importPlayers() {
       const lines = document.getElementById("bulkInput").value.split(/\r?\n/);
       const parsed = [];
-      const newPlayers = [];
       let matchedPlayers = 0;
       const seen = new Set();
       const savedTemplate = readBackup(manualBackupKey);
@@ -1744,8 +1762,7 @@ Lista del domingo
           parsed.push({ ...savedPlayer, name });
           matchedPlayers += 1;
         } else {
-          parsed.push({ name, primary: "M", secondary: "-", quality: 3, photo: "" });
-          newPlayers.push(name);
+          parsed.push({ name, primary: "M", secondary: "-", quality: 3, photo: "", needsReview: true });
         }
         seen.add(key);
       });
@@ -1755,6 +1772,33 @@ Lista del domingo
         return;
       }
 
+      // Todo convocado desconocido pasa también a la plantilla. La marca
+      // needsReview obliga a confirmar su posición y nivel antes del sorteo.
+      const roster = readBackup(manualBackupKey) || [];
+      let addedToRoster = 0;
+      parsed.forEach(player => {
+        if (!findSavedPlayer(player.name, roster)) {
+          roster.push({
+            name: player.name,
+            primary: player.primary || "M",
+            secondary: player.secondary || "-",
+            quality: Number(player.quality) || 3,
+            photo: player.photo || "",
+            needsReview: true
+          });
+          addedToRoster += 1;
+        }
+      });
+      if (addedToRoster) {
+        try {
+          localStorage.setItem(manualBackupKey, JSON.stringify(roster));
+          renderRoster();
+        } catch (_) {
+          setStatus("No fue posible guardar los jugadores nuevos en la plantilla.", true);
+          return;
+        }
+      }
+
       playersEl.innerHTML = "";
       isRestoring = true;
       parsed.forEach(addPlayer);
@@ -1762,9 +1806,12 @@ Lista del domingo
       clearResults();
       saveAutomaticBackup();
 
-      if (newPlayers.length) {
+      const pendingNames = parsed
+        .filter(player => player.needsReview)
+        .map(player => player.name);
+      if (pendingNames.length) {
         setStatus(
-          `${matchedPlayers} reconocidos en la plantilla y ${newPlayers.length} nuevos. Revisa: ${newPlayers.join(", ")}.`,
+          `${matchedPlayers} reconocidos y ${addedToRoster} nuevos añadidos a Jugadores. Completa sus datos: ${pendingNames.join(", ")}.`,
           true
         );
       } else {
@@ -2055,6 +2102,14 @@ Lista del domingo
     function generateSolutions() {
       try {
         const players = getPlayers();
+        const roster = readBackup(manualBackupKey) || [];
+        const pendingPlayers = players.filter(player => findSavedPlayer(player.name, roster)?.needsReview);
+        if (pendingPlayers.length) {
+          const names = pendingPlayers.map(player => player.name).join(", ");
+          showPage("jugadores");
+          setRosterStatus(`Completa y guarda los datos de los jugadores nuevos antes de crear los equipos: ${names}.`, true);
+          throw new Error(`Faltan datos obligatorios de: ${names}.`);
+        }
         const solutions = solveTeams(players);
 
         if (!solutions.length) throw new Error("No fue posible generar los equipos.");
