@@ -417,6 +417,7 @@ Lista del domingo
 3. Fredy
 4. Uribe"></textarea>
           <p class="help">
+            Escribe solamente un nombre por línea; la numeración y los símbolos de confirmación son opcionales.
             La página busca cada nombre en la plantilla guardada y recupera automáticamente su posición y nivel.
             Los jugadores nuevos se añaden como mediocampistas de nivel 3 para que puedas revisarlos.
           </p>
@@ -447,6 +448,9 @@ Lista del domingo
         <button class="btn btn-outline" id="alternativeBtn">Otra opción equilibrada</button>
         <button class="btn btn-outline" id="saveBackupBtn">Guardar plantilla</button>
         <button class="btn btn-outline" id="restoreBackupBtn">Restaurar plantilla</button>
+        <button class="btn btn-outline" id="downloadRosterBtn">Descargar archivo de jugadores</button>
+        <button class="btn btn-outline" id="uploadRosterBtn">Importar archivo de jugadores</button>
+        <input type="file" id="rosterFileInput" accept="application/json,.json" hidden>
         <button class="btn btn-secondary" id="clearBtn">Borrar todo</button>
       </div>
 
@@ -651,6 +655,84 @@ Lista del domingo
       setStatus(`Plantilla restaurada: ${players.length} jugadores.`, false);
     }
 
+    function validateRosterPlayers(data) {
+      const source = Array.isArray(data) ? data : data?.players;
+      if (!Array.isArray(source) || !source.length) return null;
+
+      const validPositions = new Set(["P", "D", "M", "A"]);
+      const validSecondaryPositions = new Set(["-", "P", "D", "M", "A"]);
+
+      const players = source.map(player => ({
+        name: String(player?.name || "").trim(),
+        primary: String(player?.primary || "M").toUpperCase(),
+        secondary: String(player?.secondary || "-").toUpperCase(),
+        quality: Number(player?.quality)
+      }));
+
+      const isValid = players.every(player =>
+        player.name &&
+        validPositions.has(player.primary) &&
+        validSecondaryPositions.has(player.secondary) &&
+        Number.isInteger(player.quality) &&
+        player.quality >= 1 &&
+        player.quality <= 5
+      );
+
+      return isValid ? players : null;
+    }
+
+    function downloadRosterFile() {
+      const players = readBackup(manualBackupKey) ||
+        getPlayerRowsForBackup().filter(player => player.name);
+
+      if (!players.length) {
+        setStatus("No hay jugadores para guardar en el archivo.", true);
+        return;
+      }
+
+      const roster = {
+        version: 1,
+        club: "Club Amigos de la Peña",
+        exportedAt: new Date().toISOString(),
+        players
+      };
+      const blob = new Blob([JSON.stringify(roster, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "plantilla-jugadores.json";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setStatus(`Archivo creado con ${players.length} jugadores.`, false);
+    }
+
+    function importRosterFile(file) {
+      if (!file) return;
+      const reader = new FileReader();
+
+      reader.addEventListener("load", () => {
+        try {
+          const players = validateRosterPlayers(JSON.parse(reader.result));
+          if (!players) throw new Error("invalid");
+          localStorage.setItem(manualBackupKey, JSON.stringify(players));
+          applyBackup(players);
+          setStatus(`Archivo importado: ${players.length} jugadores guardados en la plantilla.`, false);
+        } catch (_) {
+          setStatus("El archivo no contiene una plantilla de jugadores válida.", true);
+        } finally {
+          document.getElementById("rosterFileInput").value = "";
+        }
+      });
+
+      reader.addEventListener("error", () => {
+        setStatus("No fue posible leer el archivo de jugadores.", true);
+      });
+
+      reader.readAsText(file);
+    }
+
     function getPlayers() {
       const rows = [...playersEl.querySelectorAll(".player-row")];
       const players = [];
@@ -683,26 +765,6 @@ Lista del domingo
       if (players.length > 22) throw new Error("El máximo es de 22 jugadores: 11 contra 11.");
 
       return players;
-    }
-
-    function parseBulkLine(line) {
-      let clean = line.trim();
-      if (!clean) return null;
-
-      clean = clean.replace(/^\s*\d+\s*[-.)]?\s*/, "");
-      clean = clean.replace(/[;,|]+/g, " ");
-      clean = clean.replace(/\s+-\s+/g, " ");
-      clean = clean.replace(/\s+/g, " ").trim();
-
-      const match = clean.match(/^(.*?)\s+([PDMA])(?:\/([PDMA]))?\s+([1-5])$/i);
-      if (!match) return null;
-
-      return {
-        name: match[1].trim(),
-        primary: match[2].toUpperCase(),
-        secondary: match[3] ? match[3].toUpperCase() : "-",
-        quality: Number(match[4])
-      };
     }
 
     function normalizePlayerName(name) {
@@ -747,16 +809,6 @@ Lista del domingo
 
       lines.forEach(line => {
         if (!line.trim()) return;
-        const detailedPlayer = parseBulkLine(line);
-        if (detailedPlayer) {
-          const key = normalizePlayerName(detailedPlayer.name);
-          if (!seen.has(key)) {
-            parsed.push(detailedPlayer);
-            seen.add(key);
-          }
-          return;
-        }
-
         const name = parseWhatsAppName(line);
         if (!name) return;
         const key = normalizePlayerName(name);
@@ -1039,6 +1091,13 @@ Lista del domingo
     document.getElementById("alternativeBtn").addEventListener("click", showAlternative);
     document.getElementById("saveBackupBtn").addEventListener("click", saveManualBackup);
     document.getElementById("restoreBackupBtn").addEventListener("click", restoreManualBackup);
+    document.getElementById("downloadRosterBtn").addEventListener("click", downloadRosterFile);
+    document.getElementById("uploadRosterBtn").addEventListener("click", () => {
+      document.getElementById("rosterFileInput").click();
+    });
+    document.getElementById("rosterFileInput").addEventListener("change", event => {
+      importRosterFile(event.target.files[0]);
+    });
     document.getElementById("clearBtn").addEventListener("click", clearAll);
     document.getElementById("importBtn").addEventListener("click", importPlayers);
 
