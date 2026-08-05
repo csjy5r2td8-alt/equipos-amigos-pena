@@ -590,6 +590,7 @@ Lista del domingo
           <p class="help">
             Escribe solamente un nombre por línea; la numeración y los símbolos de confirmación son opcionales.
             La página busca cada nombre en la plantilla guardada y recupera automáticamente su posición y nivel.
+            Mantén el orden de llegada: si no hay portero, el último de la lista empieza en la portería y la rotación continúa hacia atrás.
             Los jugadores nuevos se añaden como mediocampistas de nivel 3 para que puedas revisarlos.
           </p>
         </div>
@@ -625,7 +626,7 @@ Lista del domingo
         <button class="btn btn-secondary" id="clearBtn">Borrar todo</button>
       </div>
 
-      <p class="help">Primero registra los jugadores habituales y pulsa “Guardar plantilla”. Cada domingo podrás pegar solamente los nombres confirmados desde WhatsApp.</p>
+      <p class="help">Reglas tácticas: con 11 jugadores, 4-4-2 o 4-3-3; con 10 jugadores, 3-4-2 o 3-3-3. El portero no se incluye en esos números. El generador elige la opción que mejor encaja con las posiciones guardadas.</p>
 
       <p class="status" id="status"></p>
       <div class="reserve-card" id="reserveCard"></div>
@@ -715,6 +716,17 @@ Lista del domingo
       M: "Mediocampista",
       A: "Atacante",
       "-": "Sin posición"
+    };
+
+    const formationRules = {
+      11: [
+        { label: "4-4-2", slots: { P: 1, D: 4, M: 4, A: 2 } },
+        { label: "4-3-3", slots: { P: 1, D: 4, M: 3, A: 3 } }
+      ],
+      10: [
+        { label: "3-4-2", slots: { P: 1, D: 3, M: 4, A: 2 } },
+        { label: "3-3-3", slots: { P: 1, D: 3, M: 3, A: 3 } }
+      ]
     };
 
     function positionOptions(includeNone = false) {
@@ -1307,11 +1319,55 @@ Lista del domingo
       return player.primary === position || player.secondary === position;
     }
 
+    function scoreFormation(counts, formation) {
+      let score = 0;
+      ["P", "D", "M", "A"].forEach(position => {
+        const target = formation.slots[position];
+        const primaryCount = counts.primary[position];
+        const coverCount = counts.cover[position];
+
+        // Las posiciones principales orientan la táctica; las secundarias
+        // permiten cubrir una plaza cuando sea necesario.
+        score += Math.abs(primaryCount - target) * 60;
+        if (coverCount < target) score += (target - coverCount) * 2500;
+      });
+      return score;
+    }
+
+    function chooseFormation(team) {
+      const options = formationRules[team.length];
+      if (!options) return null;
+      const counts = {
+        primary: { P: 0, D: 0, M: 0, A: 0 },
+        cover: { P: 0, D: 0, M: 0, A: 0 }
+      };
+      team.forEach(player => {
+        counts.primary[player.primary] += 1;
+        counts.cover[player.primary] += 1;
+        if (player.secondary !== "-" && player.secondary !== player.primary) {
+          counts.cover[player.secondary] += 1;
+        }
+      });
+      return options
+        .map(formation => ({ ...formation, score: scoreFormation(counts, formation) }))
+        .sort((a, b) => a.score - b.score)[0];
+    }
+
+    function goalkeeperRotation(team) {
+      if (team.some(player => playerCanCover(player, "P"))) return [];
+      return [...team].sort((a, b) => b.id - a.id);
+    }
+
     function evaluate(teamA, teamB, totalGoalkeepers) {
       const a = teamStats(teamA);
       const b = teamStats(teamB);
 
       let score = 0;
+
+      const formationA = chooseFormation(teamA);
+      const formationB = chooseFormation(teamB);
+      if (formationA) score += formationA.score;
+      if (formationB) score += formationB.score;
 
       // El nivel total es el criterio principal. Cuando un equipo tiene
       // un jugador menos, suele recibir jugadores con un nivel más alto.
@@ -1478,14 +1534,17 @@ Lista del domingo
 
       document.getElementById("scoreA").textContent = `${statsA.quality} puntos`;
       document.getElementById("scoreB").textContent = `${statsB.quality} puntos`;
-      document.getElementById("summaryA").innerHTML = summaryHtml(statsA, teamA.length);
-      document.getElementById("summaryB").innerHTML = summaryHtml(statsB, teamB.length);
+      const formationA = chooseFormation(teamA);
+      const formationB = chooseFormation(teamB);
+      document.getElementById("summaryA").innerHTML = summaryHtml(statsA, teamA.length, formationA, teamA);
+      document.getElementById("summaryB").innerHTML = summaryHtml(statsB, teamB.length, formationB, teamB);
 
       const difference = Math.abs(statsA.quality - statsB.quality);
       balanceBoxEl.innerHTML =
         `Formato: <strong>${teamA.length} contra ${teamB.length}</strong>. ` +
         `Diferencia de nivel total: <strong>${difference} ${difference === 1 ? "punto" : "puntos"}</strong>. ` +
-        `Promedios: ${statsA.average.toFixed(2)} contra ${statsB.average.toFixed(2)}.`;
+        `Promedios: ${statsA.average.toFixed(2)} contra ${statsB.average.toFixed(2)}.` +
+        `${formationA && formationB ? ` Tácticas: <strong>${formationA.label}</strong> contra <strong>${formationB.label}</strong>.` : ""}`;
       balanceBoxEl.classList.add("visible");
 
       reserveCardEl.classList.remove("visible");
@@ -1513,10 +1572,13 @@ Lista del domingo
       `).join("");
     }
 
-    function summaryHtml(stats, size) {
+    function summaryHtml(stats, size, formation, team) {
+      const rotation = goalkeeperRotation(team);
       return `
         ${size} jugadores · Promedio ${stats.average.toFixed(2)}<br>
+        ${formation ? `<strong>Táctica ${formation.label}</strong><br>` : ""}
         P: ${stats.P} · D: ${stats.D} · M: ${stats.M} · A: ${stats.A}
+        ${rotation.length ? `<br><strong>Rotación de portería:</strong> ${rotation.map(player => escapeHtml(player.name)).join(" → ")}` : ""}
       `;
     }
 
