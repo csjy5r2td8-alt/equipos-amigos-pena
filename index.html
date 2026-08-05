@@ -168,7 +168,7 @@
 
     .roster-form {
       display: grid;
-      grid-template-columns: minmax(180px, 1fr) 120px 150px 150px 95px auto;
+      grid-template-columns: minmax(180px, 1fr) 190px 150px 150px 95px auto;
       gap: 10px;
       align-items: end;
     }
@@ -238,6 +238,19 @@
     .mini-actions .btn { min-height: 36px; padding: 0 11px; font-size: 13px; }
 
     .photo-picker { display: flex; align-items: center; gap: 8px; }
+    .photo-picker {
+      min-height: 48px;
+      padding: 3px;
+      border: 1px dashed transparent;
+      border-radius: 12px;
+      outline: none;
+    }
+    .photo-picker:focus,
+    .photo-picker.paste-ready {
+      border-color: #55d6ea;
+      background: rgba(85,214,234,.07);
+    }
+    .paste-hint { color: var(--muted); font-size: 10px; line-height: 1.2; }
     .photo-preview {
       width: 44px;
       height: 44px;
@@ -722,7 +735,7 @@
       border: 2px solid rgba(255,255,255,.46);
       border-radius: 6px;
       background:
-        linear-gradient(90deg, transparent 49.7%, rgba(255,255,255,.42) 49.7% 50.3%, transparent 50.3%),
+        linear-gradient(180deg, transparent 49.7%, rgba(255,255,255,.42) 49.7% 50.3%, transparent 50.3%),
         repeating-linear-gradient(90deg, #197247 0 14.28%, #1d7c4e 14.28% 28.56%);
     }
     .football-pitch::before {
@@ -739,12 +752,24 @@
     .football-pitch::after {
       content: "";
       position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.48);
+      transform: translate(-50%, -50%);
+    }
+    .pitch-box {
+      position: absolute;
       left: 25%;
       right: 25%;
-      bottom: -2px;
+      z-index: 1;
       height: 13%;
       border: 2px solid rgba(255,255,255,.42);
     }
+    .pitch-box.top { top: -2px; }
+    .pitch-box.bottom { bottom: -2px; }
     .pitch-player {
       position: absolute;
       z-index: 2;
@@ -843,9 +868,10 @@
         </div>
         <div class="field-group photo-field">
           <label for="rosterPhoto">Foto</label>
-          <div class="photo-picker">
+          <div class="photo-picker" id="photoPasteZone" tabindex="0" title="Haz clic aquí y pega una imagen">
             <img class="photo-preview" id="rosterPhotoPreview" src="logo-club-amigos-de-la-pena.png" alt="Vista previa de la foto">
             <label class="btn btn-outline" for="rosterPhoto">Elegir</label>
+            <span class="paste-hint">o pega<br>⌘V / Ctrl+V</span>
             <input id="rosterPhoto" type="file" accept="image/png,image/jpeg,image/webp" hidden>
           </div>
         </div>
@@ -1421,6 +1447,20 @@ Lista del domingo
         });
         reader.readAsDataURL(file);
       });
+    }
+
+    async function prepareRosterPhoto(file) {
+      if (!file || !file.type.startsWith("image/")) {
+        setRosterStatus("El contenido pegado no es una imagen.", true);
+        return;
+      }
+      try {
+        pendingRosterPhoto = await compressPlayerPhoto(file);
+        document.getElementById("rosterPhotoPreview").src = pendingRosterPhoto;
+        setRosterStatus("Foto preparada. Pulsa “Guardar jugador” para conservarla.", false);
+      } catch (_) {
+        setRosterStatus("No fue posible preparar esa foto.", true);
+      }
     }
 
     function renderRoster() {
@@ -2139,7 +2179,7 @@ Lista del domingo
       };
       team.forEach(player => rows[player.assignedPosition || player.primary].players.push(player));
 
-      pitch.innerHTML = Object.entries(rows).flatMap(([position, row]) =>
+      const playersHtml = Object.entries(rows).flatMap(([position, row]) =>
         row.players.map((player, index) => {
           const left = ((index + 1) / (row.players.length + 1)) * 100;
           const avatar = player.photo
@@ -2153,6 +2193,7 @@ Lista del domingo
           `;
         })
       ).join("");
+      pitch.innerHTML = '<span class="pitch-box top"></span><span class="pitch-box bottom"></span>' + playersHtml;
     }
 
     function summaryHtml(stats, size, formation, team) {
@@ -2172,14 +2213,27 @@ Lista del domingo
     });
     document.getElementById("rosterPhoto").addEventListener("change", async event => {
       const file = event.target.files[0];
-      if (!file) return;
-      try {
-        pendingRosterPhoto = await compressPlayerPhoto(file);
-        document.getElementById("rosterPhotoPreview").src = pendingRosterPhoto;
-        setRosterStatus("Foto preparada. Pulsa “Guardar jugador” para conservarla.", false);
-      } catch (_) {
-        setRosterStatus("No fue posible preparar esa foto.", true);
+      await prepareRosterPhoto(file);
+    });
+    const photoPasteZone = document.getElementById("photoPasteZone");
+    photoPasteZone.addEventListener("paste", async event => {
+      const imageItem = [...event.clipboardData.items].find(item => item.type.startsWith("image/"));
+      if (!imageItem) {
+        setRosterStatus("No encontré ninguna imagen en el portapapeles.", true);
+        return;
       }
+      event.preventDefault();
+      await prepareRosterPhoto(imageItem.getAsFile());
+    });
+    photoPasteZone.addEventListener("dragover", event => {
+      event.preventDefault();
+      photoPasteZone.classList.add("paste-ready");
+    });
+    photoPasteZone.addEventListener("dragleave", () => photoPasteZone.classList.remove("paste-ready"));
+    photoPasteZone.addEventListener("drop", async event => {
+      event.preventDefault();
+      photoPasteZone.classList.remove("paste-ready");
+      await prepareRosterPhoto(event.dataTransfer.files[0]);
     });
     rosterListEl.addEventListener("click", event => {
       const button = event.target.closest("[data-roster-action]");
